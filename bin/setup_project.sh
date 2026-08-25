@@ -1,25 +1,33 @@
 #!/bin/bash
 
 # Использование:
-# ./setup_project.sh <project_name> [branch]
+# ./setup_project.sh <project_name> [branch] [description]
 #
 # project_name = имя проекта на GitHub и папки
 # branch       = ветка для git pull (по умолчанию release)
+# description  = описание сервиса для systemd (по умолчанию "Service for <project_name>")
 
 if [ $# -lt 1 ]; then
-    echo "Использование: $0 <project_name> [branch]"
+    echo "Использование: $0 <project_name> [branch] [description]"
     exit 1
 fi
 
 PROJECT_NAME=$1
-BRANCH=${2:-release}   # если ветка не указана → release
+BRANCH=${2:-release}
+DESCRIPTION=${3:-"Service for $PROJECT_NAME project"}
+
 GITHUB_USER="MrGeomancer"
 SERVICE_FILE="/etc/systemd/system/$PROJECT_NAME.service"
 
-echo "=== Создаём проект $PROJECT_NAME (ветка: $BRANCH) ==="
+# Определяем реального пользователя и его домашний каталог (даже при запуске через sudo)
+TARGET_USER="${SUDO_USER:-$USER}"
+TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+
+echo "=== Создаём/обновляем проект $PROJECT_NAME (ветка: $BRANCH) ==="
+echo "--> Описание: $DESCRIPTION"
 
 # 1. Клонирование репозитория
-cd ~ || exit
+cd "$TARGET_HOME" || exit
 if [ ! -d "$PROJECT_NAME" ]; then
     echo "--> Клонируем git@github.com:$GITHUB_USER/$PROJECT_NAME.git"
     git clone "git@github.com:$GITHUB_USER/$PROJECT_NAME.git"
@@ -35,7 +43,7 @@ if [ ! -d "venv" ]; then
     python3 -m venv venv
 fi
 
-# 3. Установка зависимостей
+# 3. Первичная установка зависимостей
 echo "--> Устанавливаем зависимости"
 source venv/bin/activate
 pip install --upgrade pip
@@ -45,32 +53,32 @@ deactivate
 # 4. Папка для логов
 mkdir -p logs
 
-# 5. Создание systemd unit
-if [ ! -f "$SERVICE_FILE" ]; then
-    echo "--> Создаём systemd unit: $SERVICE_FILE"
-    sudo bash -c "cat > $SERVICE_FILE" <<EOL
+# 5. Создание/обновление systemd unit
+echo "--> Генерируем systemd unit: $SERVICE_FILE"
+sudo bash -c "cat > $SERVICE_FILE" <<EOL
 [Unit]
-Description=Service for $PROJECT_NAME project
+Description=$DESCRIPTION
 After=network-online.target
 Wants=network-online.target
-# OnFailure=send-alert@%n.service  # ЗАКОММЕНТИРОВАНО: вызывает ошибки DNS
 
 [Service]
-User=$USER
-Group=$USER
-WorkingDirectory=/home/$USER/$PROJECT_NAME
+User=$TARGET_USER
+Group=$TARGET_USER
+WorkingDirectory=$TARGET_HOME/$PROJECT_NAME
 
-# Минус (-) перед командой означает: "если команда упадет, не прерывать запуск сервиса"
--ExecStartPre=/usr/bin/git -C /home/$USER/$PROJECT_NAME fetch origin $BRANCH
--ExecStartPre=/usr/bin/git -C /home/$USER/$PROJECT_NAME reset --hard origin/$BRANCH
--ExecStartPre=/home/$USER/$PROJECT_NAME/venv/bin/pip install -q -r /home/$USER/$PROJECT_NAME/requirements.txt
+# Если нет сети или упал git, запуск продолжится с текущим кодом
+-ExecStartPre=/usr/bin/git -C $TARGET_HOME/$PROJECT_NAME fetch origin $BRANCH
+-ExecStartPre=/usr/bin/git -C $TARGET_HOME/$PROJECT_NAME reset --hard origin/$BRANCH
 
-ExecStart=/home/$USER/$PROJECT_NAME/venv/bin/python3 /home/$USER/$PROJECT_NAME/main.py
+# pip install без '-'! Если упадет сборка пакетов, systemd покажет внятную ошибку
+ExecStartPre=$TARGET_HOME/$PROJECT_NAME/venv/bin/pip install -q -r $TARGET_HOME/$PROJECT_NAME/requirements.txt
+
+ExecStart=$TARGET_HOME/$PROJECT_NAME/venv/bin/python3 $TARGET_HOME/$PROJECT_NAME/main.py
 Environment="UNIT_NAME=$PROJECT_NAME.service"
-StandardOutput=null
-StandardError=append:/home/$USER/$PROJECT_NAME/logs/service_errors.log
 
-# Защита от бесконечного цикла падений: макс 3 перезапуска за 5 минут, потом стоп
+StandardOutput=journal
+StandardError=append:$TARGET_HOME/$PROJECT_NAME/logs/service_errors.log
+
 Restart=on-failure
 RestartSec=15s
 StartLimitBurst=3
@@ -79,9 +87,7 @@ StartLimitIntervalSec=300
 [Install]
 WantedBy=multi-user.target
 EOL
-else
-    echo "--> Unit уже существует: $SERVICE_FILE"
-fi
+
 # 6. Подключаем таймер ежедневного рестарта
 if systemctl list-unit-files | grep -q "botrestart@.timer"; then
     echo "--> Включаем ежедневный рестарт для $PROJECT_NAME"
@@ -90,7 +96,7 @@ else
     echo "!!! Шаблон botrestart@.timer не найден, пропускаем настройку ежедневного рестарта"
 fi
 
-# 7. Добавляем проект в MOTD для авто-отображения статуса
+# 7. Добавляем проект в MOTD
 MOTD_FILE="/etc/update-motd.d/99-custom"
 if [ -f "$MOTD_FILE" ]; then
     if ! grep -q "$PROJECT_NAME" "$MOTD_FILE"; then
@@ -111,4 +117,3 @@ sudo systemctl restart "$PROJECT_NAME"
 sudo systemctl status "$PROJECT_NAME" --no-pager
 
 echo "=== Готово! Сервис $PROJECT_NAME работает ==="
-
