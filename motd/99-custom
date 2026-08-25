@@ -1,0 +1,74 @@
+#!/bin/bash
+# Цвета
+RED="\033[1;31m"
+GREEN="\033[1;32m"
+CYAN="\033[1;36m"
+YELLOW="\033[1;33m"
+BLUE="\033[1;34m"
+RESET="\033[0m"
+
+echo -e "${BLUE}========================================${RESET}"
+echo -e "${CYAN}   Добро пожаловать на сервер, avpoi!${RESET}"
+echo -e "${BLUE}========================================${RESET}"
+echo ""
+echo -e "${GREEN}Мои команды:${RESET}"
+echo -e "  ${CYAN}./setup_project.sh <имя> <branch or release>${RESET}        — развернуть проект"
+echo -e "  ${CYAN} sudo nano setup_project.sh        - изменить логику развертки"
+echo -e "  ${CYAN} sudo nano /etc/update-motd.d/99-custom                     - изменить вступление "
+echo -e "  ${CYAN} svcctl enable <project> / svcctl disable <project>         - включить или выключить сервис и его таймер "
+echo ""
+echo -e "${GREEN}Навигация:${RESET}"
+echo -e "  ${CYAN}ls${RESET}                         — список файлов и папок"
+echo -e "  ${CYAN}cd <папка>${RESET}                  — перейти в папку"
+echo -e "  ${CYAN}pwd${RESET}                         — показать текущий путь"
+echo ""
+echo -e "${GREEN}Файлы:${RESET}"
+echo -e "  ${CYAN}mkdir <имя>${RESET}                 — создать папку"
+echo -e "  ${CYAN}touch <имя>${RESET}                 — создать файл"
+echo -e "  ${CYAN}cp <источник> <назначение>${RESET}  — копировать"
+echo -e "  ${CYAN}mv <from path> <to path>${RESET}    — переместить/переименовать"
+echo -e "  ${CYAN}rm <file path>${RESET}              — удалить файл"
+echo -e "  ${CYAN}rm -r <dir>${RESET}                 — удалить папку"
+echo ""
+
+echo -e "${GREEN}Просмотр:${RESET}"
+echo -e "  ${CYAN}cat <file>${RESET}                  — содержимое файла"
+echo -e "  ${CYAN}less <file>${RESET}                 — постраничный просмотр"
+echo -e "  ${CYAN}sudo nano <file>${RESET}            — редактирование"
+echo ""
+
+echo -e "${GREEN}Git:${RESET}"
+echo -e "  ${CYAN}git clone <url>${RESET}             — скопировать репозиторий"
+echo -e "  ${CYAN}git pull origin <branch>${RESET}    — обновить код"
+echo -e "  ${CYAN}git status${RESET}                  — проверить изменения"
+echo ""
+
+echo -e "${GREEN}Python:${RESET}"
+echo -e "  ${CYAN}python3 -m venv <venv>${RESET}          — создать виртуальное окружение"
+echo -e "  ${CYAN}source <venv>/bin/activate${RESET}      — активировать"
+echo -e "  ${CYAN}pip install -r <requirements>.txt${RESET} — зависимости"
+echo -e "  ${CYAN}deactivate${RESET}                      — выйти из окружения"
+echo ""
+
+echo -e "${GREEN}Systemd:${RESET}"
+echo -e "  ${CYAN}systemctl status <name>.service${RESET}   — статус"
+echo -e "  ${CYAN}systemctl restart <name>.service${RESET}  — перезапуск"
+echo -e "  ${CYAN}journalctl -u <name>.service -f${RESET}   — логи"
+echo -e "  ${CYAN}sudo nano /etc/systemd/system/<name>.service   -поменять параметры запуска"
+echo -e "при смене айпи для починки mongo надо sudo nano /etc/mongod.conf, там 127.0.0.1,192.168.0.17,192.168.193.163"
+echo -e "${YELLOW}Сегодня:${RESET} ${CYAN}$(date)${RESET}"
+echo ""
+
+
+
+# === Статусы сервисов ===
+echo -e "${GREEN}Статусы ботов:${RESET}"
+
+for service in f1manager_bot deepseek_bot tg-kabinet_bot professional_operator; do
+    if systemctl is-active --quiet "${service}.service"; then
+        echo -e "  ${service}.service: ${GREEN}● Активен${RESET}"
+    else
+        echo -e "  ${service}.service: ${RED}✖ Не работает${RESET}"
+    fi
+done
+
