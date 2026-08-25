@@ -1,0 +1,37 @@
+#!/bin/bash
+set -euo pipefail
+
+if [ $# -ne 2 ]; then
+    echo "Использование: svcctl {enable|disable} <project_name>"
+    exit 1
+fi
+
+action="$1"
+name="$2"
+SERVICE="${name}.service"
+TIMER="botrestart@${name}.timer"
+
+if [ "$action" = "enable" ]; then
+    echo "🔄 Включаем и запускаем $SERVICE..."
+    sudo systemctl enable --now "$SERVICE"
+    
+    echo "⏱️ Включаем таймер $TIMER..."
+    # Игнорируем ошибку, если таймера вдруг нет, чтобы не ломать весь скрипт
+    sudo systemctl enable --now "$TIMER" 2>/dev/null || echo "⚠️ Таймер не найден (это не критично)"
+    
+    echo "✅ $name успешно включён и работает"
+
+elif [ "$action" = "disable" ]; then
+    echo "🛑 Останавливаем $SERVICE и $TIMER..."
+    # Сначала жестко останавливаем, чтобы разорвать любые циклы перезапуска
+    sudo systemctl stop "$SERVICE" "$TIMER" 2>/dev/null || true
+    
+    echo "🔌 Отключаем из автозагрузки..."
+    sudo systemctl disable "$SERVICE" "$TIMER" 2>/dev/null || true
+    
+    echo "✅ $name полностью остановлен и отключён"
+else
+    echo "❌ Неизвестное действие: $action"
+    echo "Используйте: enable или disable"
+    exit 1
+fi
