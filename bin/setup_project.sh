@@ -66,11 +66,9 @@ User=$TARGET_USER
 Group=$TARGET_USER
 WorkingDirectory=$TARGET_HOME/$PROJECT_NAME
 
-# Если нет сети или упал git, запуск продолжится с текущим кодом
--ExecStartPre=/usr/bin/git -C $TARGET_HOME/$PROJECT_NAME fetch origin $BRANCH
--ExecStartPre=/usr/bin/git -C $TARGET_HOME/$PROJECT_NAME reset --hard origin/$BRANCH
-
-# pip install без '-'! Если упадет сборка пакетов, systemd покажет внятную ошибку
+# Скачиваем свежие изменения для нужной ветки и обновляем origin/$BRANCH
+ExecStartPre=/usr/bin/git -C $TARGET_HOME/$PROJECT_NAME fetch --all
+ExecStartPre=/usr/bin/git -C $TARGET_HOME/$PROJECT_NAME reset --hard origin/$BRANCH
 ExecStartPre=$TARGET_HOME/$PROJECT_NAME/venv/bin/pip install -q -r $TARGET_HOME/$PROJECT_NAME/requirements.txt
 
 ExecStart=$TARGET_HOME/$PROJECT_NAME/venv/bin/python3 $TARGET_HOME/$PROJECT_NAME/main.py
