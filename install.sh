@@ -26,6 +26,17 @@ if [ -f "$SCRIPT_DIR/motd/99-custom" ]; then
     echo "✅ MOTD успешно установлен в /etc/update-motd.d/99-custom"
 fi
 
+# 3.5 Устанавливаем systemd шаблон botrestart@
+if [ -f "$SCRIPT_DIR/systemd/botrestart@.service" ] && [ -f "$SCRIPT_DIR/systemd/botrestart@.timer" ]; then
+    echo "⏱️  Устанавливаем шаблон botrestart@..."
+    sudo cp "$SCRIPT_DIR/systemd/botrestart@.service" /etc/systemd/system/
+    sudo cp "$SCRIPT_DIR/systemd/botrestart@.timer" /etc/systemd/system/
+    sudo systemctl daemon-reload
+    echo "✅ Шаблон botrestart@ установлен"
+else
+    echo "⚠️  Файлы botrestart@.service/.timer не найдены в $SCRIPT_DIR/systemd, пропускаем"
+fi
+
 # 4. Проверяем, что ~/bin есть в PATH
 if ! echo "$PATH" | grep -q "$HOME/bin"; then
     echo "⚠️  ~/bin не найден в PATH"
